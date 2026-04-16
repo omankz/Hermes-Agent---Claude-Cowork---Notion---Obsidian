@@ -72,7 +72,7 @@ graph TB
     OB_RPi <-- bi-directional --> ST
     ST <-- bi-directional --> OB_PC
     ZT -->|"review"| CW
-    CW -->|"export PDF\n+ wiki stub"| OB_PC
+    CW -->|"export .md\n(metadata + abstrak)"| OB_PC
     CW --> NT
     HA -- MCP optional --> NT
 
@@ -81,7 +81,7 @@ graph TB
     style PC fill:#0d1117,stroke:#60a5fa,stroke-width:1px,color:#60a5fa
 ```
 
-> **Prinsip Local-First:** Seluruh inferensi, memori, dan wiki berjalan di RPi5 tanpa mengirimkan data ke cloud. **Zotero** berperan sebagai gerbang masuk literatur di sisi PC. Claude Cowork mereview library Zotero, mengekspor PDF + wiki stub ke Obsidian (PC), lalu Syncthing membawa semua perubahan ke Obsidian (RPi5). **Hermes hanya bisa membaca Obsidian RPi5** — tidak ada akses langsung ke Zotero.
+> **Prinsip Local-First:** Seluruh inferensi, memori, dan wiki berjalan di RPi5 tanpa mengirimkan data ke cloud. **Zotero** berperan sebagai gerbang masuk literatur di sisi PC. Claude Cowork mereview library Zotero, mengekspor file **.md** (metadata, abstrak, anotasi) ke Obsidian (PC), lalu Syncthing membawa semua perubahan ke Obsidian (RPi5). **Hermes hanya bisa membaca Obsidian RPi5** — tidak ada akses langsung ke Zotero.
 
 ---
 
@@ -105,7 +105,8 @@ graph TB
 ```
 MemPalace        → Memori AI lintas sesi, semua topik, verbatim ChromaDB
 Obsidian Wiki    → Knowledge base terstruktur per topik riset
-Zotero           → Reference manager: PDF, metadata, catatan anotasi
+Zotero           → Reference manager: menyimpan PDF asli, metadata, anotasi
+Obsidian raw/    → Menerima .md export dari Cowork (bukan PDF)
 Notion           → Proyek aktif, task tracking, timeline
 MEMORY.md/USER.md → Profil pengguna Hermes (preferensi personal)
 log.md           → Audit trail kronologis semua operasi wiki
@@ -193,7 +194,7 @@ systemctl --user start syncthing
 ├── index.md             # Katalog semua halaman wiki
 ├── log.md               # Append-only kronologi operasi
 ├── raw/                 # Sumber IMMUTABLE — jangan dimodifikasi
-│   ├── papers/          # PDF paper ilmiah
+│   ├── papers/          # .md export dari Zotero via Cowork (bukan PDF — PDF tetap di Zotero)
 │   ├── articles/        # Artikel web (hasil Obsidian Web Clipper)
 │   └── assets/          # Gambar dan media
 ├── wiki/                # Halaman LLM-generated
@@ -507,7 +508,7 @@ type: concept          # concept | entity | synthesis | query
 created: 2026-04-16
 updated: 2026-04-16
 sources:
-  - raw/papers/attention-is-all-you-need.pdf
+  - raw/papers/attention-is-all-you-need.md
   - raw/articles/illustrated-transformer.md
 tags: [transformer, attention, nlp, architecture]
 related: "[[entities/transformer]], [[concepts/self-attention]]"
@@ -537,8 +538,8 @@ Ingest dari raw/ → MemPalace + Wiki"]
 
     Z -->|"1. Review library
 baru / belum diproses"| CW
-    CW -->|"2. Export PDF +
-metadata"| OB
+    CW -->|"2. Export .md
+(metadata + abstrak)"| OB
     CW -->|"3. Buat entry
 terstruktur"| NT
     OB -->|"4. Syncthing sync
@@ -564,18 +565,18 @@ dari Obsidian RPi5"| H
 ```
 "Cek Zotero library saya. Temukan semua paper dengan tag 'to-ingest'
 atau yang belum diproses. Untuk setiap paper:
-1. Export PDF ke ~/obsidian/hermes-wiki/raw/papers/
-2. Buat stub halaman wiki di wiki/entities/ dengan metadata Zotero
+1. Export file **.md** (metadata, abstrak, anotasi) ke ~/obsidian/hermes-wiki/raw/papers/
+2. File .md sudah berisi metadata Zotero — letakkan langsung di raw/papers/ sebagai sumber untuk Hermes
 3. Tambahkan entry ke Notion Paper Library
 4. Tandai sebagai 'processed' di Zotero"
 ```
 
 **Step 3 — Syncthing membawa perubahan ke RPi5, lalu Hermes meng-ingest:**
 ```bash
-# Syncthing otomatis menyinkronkan raw/papers/ dan wiki/ ke Obsidian RPi5
+# Syncthing otomatis menyinkronkan raw/papers/ (.md files) dan wiki/ ke Obsidian RPi5
 # Hermes mendeteksi file baru di Obsidian RPi5 dan memprosesnya
-"Ingest semua PDF baru di raw/papers/ yang belum ada di wiki.
-Update wiki stubs yang dibuat Cowork dengan analisis penuh."
+"Ingest semua file .md baru di raw/papers/ yang belum ada di wiki.
+Buat halaman wiki penuh dari metadata dan abstrak yang sudah ada."
 ```
 
 ### Claude Cowork ↔ Zotero via MCP
@@ -687,7 +688,7 @@ flowchart LR
     ZT["📚 Zotero\nLibrary"]
     CC["🤝 Claude Cowork"]
     ZT -->|"review"| CC
-    CC -->|"PDF → raw/papers/\nmetadata → wiki stub"| ACQ["📥 Obsidian\nIngest"]
+    CC -->|".md → raw/papers/\n(metadata + abstrak)"| ACQ["📥 Obsidian\n.md Export"]
     CC -->|"entry → Paper Library\n+ metadata"| NT2["📋 Notion\nPaper Library"]
     CC -->|"Baca wiki\n→ buat laporan"| REP["📄 Generate\nReport"]
     CC -->|"Rename, sort\nraw/ files"| ORG["🗂️ Organisasi\nFile"]
@@ -706,7 +707,7 @@ flowchart LR
     E["🔃 Syncthing\nSync ke PC\nObsidian live"]
     F["📋 Notion\nUpdate Paper Library\n(opsional)"]
 
-    A -->|"Claude Cowork\nreview & export"| B
+    A -->|"Claude Cowork\nreview & export .md"| B
     B --> C --> D --> E
     A -.->|"Cowork langsung"| F
     D -.->|"opsional\nMCP"| F
@@ -736,8 +737,8 @@ hermes
    Sertakan: overview, daftar sub-topik, dan link ke relevant
    papers yang sudah ada di database kita."
 
-# Step 2: Ingest literatur awal (paper sudah ada di raw/papers/)
-> "Ingest semua PDF di raw/papers/llm-memory/ satu per satu.
+# Step 2: Ingest literatur awal (.md Zotero export sudah ada di raw/papers/)
+> "Ingest semua file .md di raw/papers/llm-memory/ satu per satu.
    Untuk setiap paper: buat entity page, update topic overview,
    catat temuan utama di wiki. Juga mine ke MemPalace wing
    'llm-memory-systems'."
@@ -801,7 +802,7 @@ title: [Judul halaman]
 type: concept | entity | synthesis | query
 created: YYYY-MM-DD
 updated: YYYY-MM-DD
-sources: [raw/papers/x.pdf, raw/articles/y.md]
+sources: [raw/papers/x.md, raw/articles/y.md]
 tags: [tag1, tag2]
 ---
 
