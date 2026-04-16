@@ -72,9 +72,8 @@ graph TB
     OB_RPi <-- 雙向同步 --> ST
     ST <-- 雙向同步 --> OB_PC
     ZT -->|"審閱"| CW
-    CW -->|"PDF + 後設資料"| OB_PC
+    CW -->|"匯出 PDF\n+ wiki stub"| OB_PC
     CW --> NT
-    HA -- MCP Zotero --> ZT
     HA -- MCP 選用 --> NT
 
     style RPi5 fill:#1a1207,stroke:#f5a623,stroke-width:1px,color:#f5a623
@@ -82,7 +81,7 @@ graph TB
     style PC fill:#0d1117,stroke:#60a5fa,stroke-width:1px,color:#60a5fa
 ```
 
-> **本地優先原則：** 所有推論、記憶與 Wiki 操作皆在 RPi5 上運行，完全不依賴雲端服務。**Zotero** 作為文獻入庫的主要閘道：Claude Cowork 審閱 Zotero 文獻庫後，將資料分發至 Obsidian（`raw/`）與 Notion（文獻庫）。Hermes 再從 Obsidian 執行入庫流程。
+> **本地優先原則：** 所有推論、記憶與 Wiki 操作皆在 RPi5 上運行，完全不依賴雲端服務。**Zotero** 是 PC 端的文獻入庫主要閘道。Claude Cowork 審閱 Zotero 文獻庫後，將 PDF 與 wiki stub 匯出至 Obsidian（PC），再由 Syncthing 將所有變更同步至 Obsidian（RPi5）。**Hermes 僅能讀取 RPi5 上的 Obsidian**——無法直接存取 Zotero。
 
 ---
 
@@ -560,8 +559,10 @@ PDF · 後設資料 · 標註 · 標籤"]
 後設資料"| OB
     CW -->|"3. 建立結構化
 條目"| NT
-    OB -->|"4. Hermes 自動
-執行入庫"| H
+    OB -->|"4. Syncthing 同步
+至 RPi5"| S2["🔃 Syncthing"]
+    S2 -->|"5. Hermes 從
+Obsidian RPi5 入庫"| H
 
     style Z fill:#1a1207,stroke:#f5a623
     style CW fill:#0a1a17,stroke:#2dd4bf
@@ -587,26 +588,19 @@ PDF · 後設資料 · 標註 · 標籤"]
 4. 在 Zotero 中標記為 'processed'」
 ```
 
-**步驟三 — Hermes 從 Obsidian 執行入庫**（正常流程）：
+**步驟三 — Syncthing 將變更帶至 RPi5，Hermes 再執行入庫：**
 ```bash
-# Hermes 偵測到 raw/papers/ 中的新檔案並處理
+# Syncthing 自動將 raw/papers/ 與 wiki/ 同步至 RPi5 上的 Obsidian
+# Hermes 偵測到 Obsidian RPi5 中的新檔案並處理
 「入庫 raw/papers/ 中所有尚未建立完整 Wiki 頁面的新 PDF。
 以完整分析內容擴充 Cowork 所建立的 wiki stub。」
 ```
 
-### Hermes ↔ Zotero 透過 MCP
+### Claude Cowork ↔ Zotero 透過 MCP
 
-Hermes 也能透過 MCP Server 直接與 Zotero 互動：
+> **重要說明：** Zotero MCP 工具僅供 **Claude Cowork**（PC 端）使用。Hermes Agent 無法直接存取 Zotero——它只能在 Syncthing 完成同步後，讀取 RPi5 上的 Obsidian。
 
-```yaml
-# ~/.hermes/config.yaml
-mcp_servers:
-  - name: zotero
-    command: python -m zotero_mcp_server
-    auto_start: true
-```
-
-| Zotero MCP 工具 | 功能 |
+| Zotero MCP 工具（由 Cowork 使用） | 功能 |
 |---|---|
 | `zotero_search_items` | 依文字、標籤或集合搜尋文獻庫 |
 | `zotero_get_item_details` | 特定論文的完整後設資料 |
