@@ -72,9 +72,8 @@ graph TB
     OB_RPi <-- bi-directional --> ST
     ST <-- bi-directional --> OB_PC
     ZT -->|"review"| CW
-    CW -->|"PDF + metadata"| OB_PC
+    CW -->|"export PDF\n+ wiki stub"| OB_PC
     CW --> NT
-    HA -- MCP Zotero --> ZT
     HA -- MCP optional --> NT
 
     style RPi5 fill:#1a1207,stroke:#f5a623,stroke-width:1px,color:#f5a623
@@ -82,7 +81,7 @@ graph TB
     style PC fill:#0d1117,stroke:#60a5fa,stroke-width:1px,color:#60a5fa
 ```
 
-> **Prinsip Local-First:** Seluruh inferensi, memori, dan wiki berjalan di RPi5 tanpa mengirimkan data ke cloud. **Zotero** berperan sebagai gerbang masuk literatur: Claude Cowork mereview library Zotero dan mendistribusikan ke Obsidian (`raw/`) dan Notion (Paper Library). Hermes kemudian meng-ingest dari Obsidian seperti biasa.
+> **Prinsip Local-First:** Seluruh inferensi, memori, dan wiki berjalan di RPi5 tanpa mengirimkan data ke cloud. **Zotero** berperan sebagai gerbang masuk literatur di sisi PC. Claude Cowork mereview library Zotero, mengekspor PDF + wiki stub ke Obsidian (PC), lalu Syncthing membawa semua perubahan ke Obsidian (RPi5). **Hermes hanya bisa membaca Obsidian RPi5** — tidak ada akses langsung ke Zotero.
 
 ---
 
@@ -542,8 +541,10 @@ baru / belum diproses"| CW
 metadata"| OB
     CW -->|"3. Buat entry
 terstruktur"| NT
-    OB -->|"4. Hermes ingest
-otomatis"| H
+    OB -->|"4. Syncthing sync
+ke RPi5"| S2["🔃 Syncthing"]
+    S2 -->|"5. Hermes ingest
+dari Obsidian RPi5"| H
 
     style Z fill:#1a1207,stroke:#f5a623
     style CW fill:#0a1a17,stroke:#2dd4bf
@@ -569,26 +570,19 @@ atau yang belum diproses. Untuk setiap paper:
 4. Tandai sebagai 'processed' di Zotero"
 ```
 
-**Step 3 — Hermes meng-ingest dari Obsidian** (alur normal):
+**Step 3 — Syncthing membawa perubahan ke RPi5, lalu Hermes meng-ingest:**
 ```bash
-# Hermes mendeteksi file baru di raw/papers/ dan memprosesnya
+# Syncthing otomatis menyinkronkan raw/papers/ dan wiki/ ke Obsidian RPi5
+# Hermes mendeteksi file baru di Obsidian RPi5 dan memprosesnya
 "Ingest semua PDF baru di raw/papers/ yang belum ada di wiki.
 Update wiki stubs yang dibuat Cowork dengan analisis penuh."
 ```
 
-### Hermes ↔ Zotero via MCP
+### Claude Cowork ↔ Zotero via MCP
 
-Hermes juga bisa langsung berinteraksi dengan Zotero via MCP server:
+> **Catatan penting:** Zotero MCP hanya digunakan oleh **Claude Cowork** (di PC), bukan oleh Hermes Agent. Hermes hanya membaca Obsidian RPi5 yang sudah disinkron oleh Syncthing — tidak ada koneksi langsung ke Zotero.
 
-```yaml
-# ~/.hermes/config.yaml
-mcp_servers:
-  - name: zotero
-    command: python -m zotero_mcp_server
-    auto_start: true
-```
-
-| MCP Tool Zotero | Fungsi |
+| MCP Tool Zotero (dipakai Cowork) | Fungsi |
 |---|---|
 | `zotero_search_items` | Cari paper di library berdasarkan teks, tag, koleksi |
 | `zotero_get_item_details` | Detail metadata lengkap sebuah paper |
