@@ -72,7 +72,7 @@ graph TB
     OB_RPi <-- 雙向同步 --> ST
     ST <-- 雙向同步 --> OB_PC
     ZT -->|"審閱"| CW
-    CW -->|"匯出 PDF\n+ wiki stub"| OB_PC
+    CW -->|"匯出 .md\n（後設資料 + 摘要）"| OB_PC
     CW --> NT
     HA -- MCP 選用 --> NT
 
@@ -81,7 +81,7 @@ graph TB
     style PC fill:#0d1117,stroke:#60a5fa,stroke-width:1px,color:#60a5fa
 ```
 
-> **本地優先原則：** 所有推論、記憶與 Wiki 操作皆在 RPi5 上運行，完全不依賴雲端服務。**Zotero** 是 PC 端的文獻入庫主要閘道。Claude Cowork 審閱 Zotero 文獻庫後，將 PDF 與 wiki stub 匯出至 Obsidian（PC），再由 Syncthing 將所有變更同步至 Obsidian（RPi5）。**Hermes 僅能讀取 RPi5 上的 Obsidian**——無法直接存取 Zotero。
+> **本地優先原則：** 所有推論、記憶與 Wiki 操作皆在 RPi5 上運行，完全不依賴雲端服務。**Zotero** 是 PC 端的文獻入庫主要閘道。Claude Cowork 審閱 Zotero 文獻庫後，將 **.md 檔案**（後設資料、摘要、標註）匯出至 Obsidian（PC），再由 Syncthing 將所有變更同步至 Obsidian（RPi5）。**Hermes 僅能讀取 RPi5 上的 Obsidian**——無法直接存取 Zotero。
 
 ---
 
@@ -105,7 +105,8 @@ graph TB
 ```
 MemPalace         → AI 跨會話記憶，涵蓋所有主題，逐字儲存於 ChromaDB
 Obsidian Wiki     → 按研究主題結構化的知識庫
-Zotero            → 文獻管理員：PDF、後設資料、標註筆記
+Zotero            → 文獻管理員：儲存原始 PDF、後設資料、標註
+Obsidian raw/     → 接收來自 Cowork 的 .md 匯出檔（非 PDF——PDF 保留在 Zotero）
 Notion            → 進行中的專案、任務追蹤、時程規劃
 MEMORY.md/USER.md → Hermes 的使用者檔案（個人偏好設定）
 log.md            → 所有 Wiki 操作的純追加式時間序列記錄
@@ -193,7 +194,7 @@ systemctl --user start syncthing
 ├── index.md             # 所有 Wiki 頁面的目錄
 ├── log.md               # 純追加式操作記錄
 ├── raw/                 # 不可變更的原始資料——Hermes 不得修改
-│   ├── papers/          # 學術論文 PDF
+│   ├── papers/          # 來自 Zotero 的 .md 匯出檔（非 PDF——PDF 保留在 Zotero）
 │   ├── articles/        # 網路文章（透過 Obsidian Web Clipper 擷取）
 │   └── assets/          # 圖片與媒體檔案
 ├── wiki/                # LLM 生成的頁面
@@ -456,7 +457,7 @@ schema   ← AGENTS.md + index.md + log.md。設定與導覽中心。
 **INGEST（入庫）** — 新增資料來源：
 
 ```
-您 → 將檔案放入 raw/papers/
+您 → 將論文加入 Zotero / 將 .md 檔案放入 raw/papers/
 Hermes：
   1. 讀取資料來源
   2. 若您在場，討論重要觀點
@@ -525,7 +526,7 @@ type: concept          # concept | entity | synthesis | query
 created: 2026-04-16
 updated: 2026-04-16
 sources:
-  - raw/papers/attention-is-all-you-need.pdf
+  - raw/papers/attention-is-all-you-need.md
   - raw/articles/illustrated-transformer.md
 tags: [transformer, attention, nlp, architecture]
 related: "[[entities/transformer]], [[concepts/self-attention]]"
@@ -547,7 +548,7 @@ PDF · 後設資料 · 標註 · 標籤"]
     CW["🤝 Claude Cowork
 審閱並處理文獻庫"]
     OB["📓 Obsidian raw/papers/
-+ 自動建立 wiki stub"]
+.md 檔案（非 PDF）"]
     NT["📋 Notion 文獻庫
 結構化條目 + 後設資料"]
     H["⚙️ Hermes
@@ -555,8 +556,8 @@ PDF · 後設資料 · 標註 · 標籤"]
 
     Z -->|"1. 審閱文獻庫
 找出新增 / 未處理項目"| CW
-    CW -->|"2. 匯出 PDF +
-後設資料"| OB
+    CW -->|"2. 匯出 .md
+（後設資料 + 摘要）"| OB
     CW -->|"3. 建立結構化
 條目"| NT
     OB -->|"4. Syncthing 同步
@@ -582,18 +583,18 @@ Obsidian RPi5 入庫"| H
 ```
 「檢查我的 Zotero 文獻庫。找出所有標記為 'to-ingest'
 或尚未處理的論文。對每篇論文：
-1. 將 PDF 匯出至 ~/obsidian/hermes-wiki/raw/papers/
-2. 在 wiki/entities/ 中建立含 Zotero 後設資料的 wiki stub
+1. 將 **.md 檔案**（後設資料、摘要、標註）匯出至 ~/obsidian/hermes-wiki/raw/papers/
+2. .md 檔案已包含 Zotero 後設資料——直接放入 raw/papers/ 作為 Hermes 的資料來源
 3. 在 Notion 文獻庫中新增條目
 4. 在 Zotero 中標記為 'processed'」
 ```
 
 **步驟三 — Syncthing 將變更帶至 RPi5，Hermes 再執行入庫：**
 ```bash
-# Syncthing 自動將 raw/papers/ 與 wiki/ 同步至 RPi5 上的 Obsidian
+# Syncthing 自動將 raw/papers/（.md 檔案）與 wiki/ 同步至 RPi5 上的 Obsidian
 # Hermes 偵測到 Obsidian RPi5 中的新檔案並處理
-「入庫 raw/papers/ 中所有尚未建立完整 Wiki 頁面的新 PDF。
-以完整分析內容擴充 Cowork 所建立的 wiki stub。」
+「入庫 raw/papers/ 中所有尚未建立完整 Wiki 頁面的新 .md 檔案。
+從已有的後設資料與摘要建立完整的 Wiki 頁面。」
 ```
 
 ### Claude Cowork ↔ Zotero 透過 MCP
@@ -705,7 +706,7 @@ flowchart LR
     ZT["📚 Zotero\n文獻庫"]
     CC["🤝 Claude Cowork"]
     ZT -->|"審閱"| CC
-    CC -->|"PDF → raw/papers/\n後設資料 → wiki stub"| ACQ["📥 Obsidian\n入庫"]
+    CC -->|".md → raw/papers/\n（後設資料 + 摘要）"| ACQ["📥 Obsidian\n.md 匯出"]
     CC -->|"建立條目\n+ 後設資料"| NT2["📋 Notion\n文獻庫"]
     CC -->|"讀取 Wiki\n→ 產生報告"| REP["📄 報告\n生成"]
     CC -->|"重新命名、排序\nraw/ 檔案"| ORG["🗂️ 檔案\n整理"]
@@ -724,7 +725,7 @@ flowchart LR
     E["🔃 Syncthing\n同步至 PC\nObsidian 即時更新"]
     F["📋 Notion\n更新文獻庫\n（選用）"]
 
-    A -->|"Claude Cowork\n審閱並匯出"| B
+    A -->|"Claude Cowork\n審閱並匯出 .md"| B
     B --> C --> D --> E
     A -.->|"Cowork 直接"| F
     D -.->|"選用\n透過 MCP"| F
@@ -753,8 +754,8 @@ hermes
    初始化 Wiki 主題頁面。
    內容包含：概覽、子主題清單，以及資料庫中相關論文的連結。」
 
-# 步驟二：入庫初始文獻（PDF 已置於 raw/papers/）
-> 「逐一入庫 raw/papers/llm-memory/ 中的所有 PDF。
+# 步驟二：入庫初始文獻（Zotero .md 匯出檔已置於 raw/papers/）
+> 「逐一入庫 raw/papers/llm-memory/ 中的所有 .md 檔案。
    對每篇論文：建立實體頁面、更新主題概覽、
    在 Wiki 中記錄重點發現。同時 Mine 至 MemPalace
    的 'llm-memory-systems' Wing。」
@@ -816,7 +817,7 @@ title: [頁面標題]
 type: concept | entity | synthesis | query
 created: YYYY-MM-DD
 updated: YYYY-MM-DD
-sources: [raw/papers/x.pdf, raw/articles/y.md]
+sources: [raw/papers/x.md, raw/articles/y.md]
 tags: [標籤一, 標籤二]
 ---
 
