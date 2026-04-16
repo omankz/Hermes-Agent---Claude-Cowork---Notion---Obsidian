@@ -11,7 +11,7 @@
 [![License](https://img.shields.io/badge/License-MIT-60a5fa?style=flat-square)]()
 [![Platform](https://img.shields.io/badge/Platform-Raspberry%20Pi%205-f87171?style=flat-square)]()
 
-*Hermes Agent + MemPalace + Obsidian + Notion + Claude Cowork*
+*Hermes Agent + MemPalace + Obsidian + **Zotero** + Notion + Claude Cowork*
 
 *Designed for deep research with full privacy — no data ever leaves your local machine.*
 
@@ -27,6 +27,7 @@
 - [MemPalace Integration](#mempalace-integration)
 - [Obsidian + Syncthing (RPi5 ↔ PC)](#obsidian--syncthing-rpi5--pc)
 - [LLM-Wiki Pattern (Karpathy)](#llm-wiki-pattern-karpathy)
+- [Zotero Integration](#zotero-integration)
 - [Notion Workflow](#notion-workflow)
 - [Claude Cowork](#claude-cowork)
 - [End-to-End Research Workflow](#end-to-end-research-workflow)
@@ -40,7 +41,7 @@ The system is organized into three layers:
 
 1. **Local Infrastructure** — Hermes Agent + Ollama + MemPalace running on Raspberry Pi 5
 2. **Sync Layer** — Syncthing keeps the Obsidian vault in sync between RPi5 and PC over LAN
-3. **Integration Layer** — Claude Cowork and Notion for UI-based tasks and project management
+3. **Integration Layer** — Zotero as reference manager, Claude Cowork as reviewer & distributor, and Notion for project management
 
 ```mermaid
 graph TB
@@ -59,7 +60,8 @@ graph TB
 
     subgraph PC["💻 PC / Workstation"]
         OB_PC["📓 Obsidian PC\nGraph View · Dataview"]
-        CW["🤝 Claude Cowork\nDesktop Automation"]
+        ZT["📚 Zotero\nReference Manager\nPDF · Metadata · Notes"]
+        CW["🤝 Claude Cowork\nReview & Distribute"]
         NT["📋 Notion\nDB · Tasks · Research Hub"]
     end
 
@@ -69,7 +71,10 @@ graph TB
     WK <--> OB_RPi
     OB_RPi <-- bi-directional --> ST
     ST <-- bi-directional --> OB_PC
+    ZT -->|"review"| CW
+    CW -->|"PDF + metadata"| OB_PC
     CW --> NT
+    HA -- MCP Zotero --> ZT
     HA -- MCP optional --> NT
 
     style RPi5 fill:#1a1207,stroke:#f5a623,stroke-width:1px,color:#f5a623
@@ -77,7 +82,7 @@ graph TB
     style PC fill:#0d1117,stroke:#60a5fa,stroke-width:1px,color:#60a5fa
 ```
 
-> **Local-First Principle:** All inference, memory, and wiki operations run on the RPi5 with zero cloud dependency. Claude Cowork and Notion are used only for tasks that require a GUI interface or team collaboration.
+> **Local-First Principle:** All inference, memory, and wiki operations run on the RPi5 with zero cloud dependency. **Zotero** acts as the literature intake gateway: Claude Cowork reviews the Zotero library and distributes to Obsidian (`raw/`) and Notion (Paper Library). Hermes then ingests from Obsidian as usual.
 
 ---
 
@@ -90,7 +95,8 @@ graph TB
 | **MemPalace** | Long-term memory system (L0–L3) | RPi5 ChromaDB | Hermes automatically |
 | **Obsidian Vault** | Human-readable wiki | RPi5 + PC (synced) | Hermes via LLM-Wiki |
 | **Syncthing** | P2P vault synchronization | LAN | — |
-| **Claude Cowork** | Desktop automation, GUI tasks | PC | You + AI |
+| **Zotero** | Reference manager, literature & citations | PC | You (input) |
+| **Claude Cowork** | Review Zotero & distribute to Obsidian/Notion | PC | You + AI |
 | **Notion** | Project management, structured DB | Cloud | You + Hermes via MCP |
 | **LLM-Wiki (Karpathy)** | Persistent wiki pattern | wiki/ in vault | Hermes |
 
@@ -100,6 +106,7 @@ graph TB
 ```
 MemPalace         → AI memory across all sessions, all topics, verbatim ChromaDB
 Obsidian Wiki     → Structured knowledge base per research topic
+Zotero            → Reference manager: PDFs, metadata, annotation notes
 Notion            → Active projects, task tracking, timelines
 MEMORY.md/USER.md → Hermes user profile (personal preferences)
 log.md            → Append-only chronological audit trail of all wiki operations
@@ -528,6 +535,103 @@ related: "[[entities/transformer]], [[concepts/self-attention]]"
 
 ---
 
+## Zotero Integration
+
+Zotero is the **primary literature intake gateway** in this ecosystem. All papers, articles, and references are first managed in Zotero, then distributed to Obsidian and Notion by Claude Cowork.
+
+### Zotero's Role in the Ecosystem
+
+```mermaid
+flowchart TD
+    Z["📚 Zotero Library
+PDF · Metadata · Annotations · Tags"]
+    CW["🤝 Claude Cowork
+Reviews & processes library"]
+    OB["📓 Obsidian raw/papers/
++ auto wiki stub"]
+    NT["📋 Notion Paper Library
+Structured entry + metadata"]
+    H["⚙️ Hermes
+Ingests from raw/ → MemPalace + Wiki"]
+
+    Z -->|"1. Review library
+new / unprocessed"| CW
+    CW -->|"2. Export PDF +
+metadata"| OB
+    CW -->|"3. Create structured
+entry"| NT
+    OB -->|"4. Hermes ingest
+automatically"| H
+
+    style Z fill:#1a1207,stroke:#f5a623
+    style CW fill:#0a1a17,stroke:#2dd4bf
+    style OB fill:#0a1127,stroke:#60a5fa
+    style NT fill:#0a1a0f,stroke:#4ade80
+    style H fill:#12093d,stroke:#c084fc
+```
+
+### Workflow: Zotero → Cowork → Obsidian + Notion
+
+**Step 1 — You add papers to Zotero** (as usual):
+- Drag & drop PDFs into Zotero
+- Use the Zotero browser connector to save directly from the web
+- Zotero auto-fetches metadata (title, authors, DOI, abstract)
+
+**Step 2 — Claude Cowork reviews the library:**
+```
+"Check my Zotero library. Find all papers tagged 'to-ingest'
+or that haven't been processed yet. For each paper:
+1. Export the PDF to ~/obsidian/hermes-wiki/raw/papers/
+2. Create a wiki stub in wiki/entities/ with Zotero metadata
+3. Add an entry to the Notion Paper Library
+4. Mark as 'processed' in Zotero"
+```
+
+**Step 3 — Hermes ingests from Obsidian** (normal flow):
+```bash
+# Hermes detects new files in raw/papers/ and processes them
+"Ingest all new PDFs in raw/papers/ that don't yet have a full wiki page.
+Expand the wiki stubs created by Cowork with full analysis."
+```
+
+### Hermes ↔ Zotero via MCP
+
+Hermes can also interact directly with Zotero through its MCP server:
+
+```yaml
+# ~/.hermes/config.yaml
+mcp_servers:
+  - name: zotero
+    command: python -m zotero_mcp_server
+    auto_start: true
+```
+
+| Zotero MCP Tool | Function |
+|---|---|
+| `zotero_search_items` | Search library by text, tag, or collection |
+| `zotero_get_item_details` | Full metadata for a specific paper |
+| `zotero_get_abstract` | Retrieve abstract from Zotero metadata |
+| `zotero_get_recent_items` | Recently added papers |
+| `zotero_list_collections` | List Zotero collections/folders |
+| `zotero_read_pdf` | Extract text from an attached PDF |
+| `zotero_compare_articles` | Side-by-side comparison of 2–5 papers |
+| `zotero_extract_bibliography` | Extract reference list from a paper |
+| `zotero_analyze_article_structure` | Split paper into IMRaD sections |
+
+### Zotero Tag Conventions
+
+Standardize these tags so Cowork can automate the distribution process:
+
+| Tag | Meaning |
+|---|---|
+| `to-ingest` | Ready to be processed into Obsidian + Notion |
+| `processed` | Already distributed by Cowork |
+| `needs-review` | You need to read it before ingesting |
+| `key-reference` | Core reference — mine into a dedicated MemPalace wing |
+| `archived` | Not relevant, skip ingest |
+
+---
+
 ## Notion Workflow
 
 ### Database Structure
@@ -604,10 +708,12 @@ Claude Cowork is a desktop agent for automating GUI-based tasks — things Herme
 
 ```mermaid
 flowchart LR
+    ZT["📚 Zotero\nLibrary"]
     CC["🤝 Claude Cowork"]
-    CC -->|"Download PDF\n→ raw/papers/"| ACQ["📥 Source\nAcquisition"]
+    ZT -->|"review"| CC
+    CC -->|"PDF → raw/papers/\nmetadata → wiki stub"| ACQ["📥 Obsidian\nIngest"]
+    CC -->|"entry → Paper Library\n+ metadata"| NT2["📋 Notion\nPaper Library"]
     CC -->|"Read wiki\n→ generate report"| REP["📄 Report\nGeneration"]
-    CC -->|"Obsidian wiki\n→ Notion DB"| TRF["🔄 Wiki →\nNotion Transfer"]
     CC -->|"Rename, sort\nraw/ files"| ORG["🗂️ File\nOrganization"]
 
     style CC fill:#1a1207,stroke:#f5a623
@@ -617,14 +723,16 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    A["🤝 Claude Cowork\nDownload PDF\n→ raw/papers/"]
+    A["📚 Zotero\nPaper stored\nin library"]
     B["⚙️ Hermes\nIngest & Extract\nkey insights"]
     C["🏛️ MemPalace\nStore verbatim\nin ChromaDB"]
     D["📓 Obsidian Wiki\nWrite wiki pages\n+ update index"]
     E["🔃 Syncthing\nSync to PC\nObsidian live reload"]
     F["📋 Notion\nUpdate Paper Library\n(optional)"]
 
-    A --> B --> C --> D --> E
+    A -->|"Claude Cowork\nreview & export"| B
+    B --> C --> D --> E
+    A -.->|"Cowork direct"| F
     D -.->|"optional\nvia MCP"| F
 
     style A fill:#1a1207,stroke:#f5a623
@@ -635,7 +743,7 @@ flowchart LR
     style F fill:#0a1a0f,stroke:#4ade80
 ```
 
-**Estimated processing time:** ~2–5 minutes per paper. Everything runs locally on the RPi5.
+**Estimated processing time:** ~2–5 minutes per paper (once the paper is in Zotero). Everything runs locally on the RPi5.
 
 ---
 
