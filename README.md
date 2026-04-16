@@ -11,7 +11,8 @@
 [![License](https://img.shields.io/badge/License-MIT-60a5fa?style=flat-square)]()
 [![Platform](https://img.shields.io/badge/Platform-Raspberry%20Pi%205-f87171?style=flat-square)]()
 
-*Hermes Agent + MemPalace + Obsidian + Notion + Claude Cowork*  
+*Hermes Agent + MemPalace + Obsidian + **Zotero** + Notion + Claude Cowork*
+
 *Didesain untuk riset mendalam dengan privasi penuh — tidak ada data yang keluar dari mesin lokal Anda.*
 
 </div>
@@ -26,6 +27,7 @@
 - [Integrasi MemPalace](#integrasi-mempalace)
 - [Obsidian + Syncthing](#obsidian--syncthing-rpi5--pc)
 - [Pola LLM-Wiki (Karpathy)](#pola-llm-wiki-karpathy)
+- [Integrasi Zotero](#integrasi-zotero)
 - [Workflow Notion](#workflow-notion)
 - [Claude Cowork](#claude-cowork)
 - [Workflow Riset End-to-End](#workflow-riset-end-to-end)
@@ -39,7 +41,7 @@ Sistem ini terdiri dari tiga lapisan:
 
 1. **Infrastruktur Lokal** — Hermes Agent + Ollama + MemPalace berjalan di Raspberry Pi 5
 2. **Layer Sinkronisasi** — Syncthing menjaga vault Obsidian tetap sinkron antara RPi5 dan PC via LAN
-3. **Layer Integrasi** — Claude Cowork dan Notion untuk UI-based tasks dan project management
+3. **Layer Integrasi** — Zotero sebagai reference manager, Claude Cowork sebagai reviewer & distributor, dan Notion untuk project management
 
 ```mermaid
 graph TB
@@ -58,7 +60,8 @@ graph TB
 
     subgraph PC["💻 PC / Workstation"]
         OB_PC["📓 Obsidian PC\nGraph View · Dataview"]
-        CW["🤝 Claude Cowork\nDesktop Automation"]
+        ZT["📚 Zotero\nReference Manager\nPDF · Metadata · Notes"]
+        CW["🤝 Claude Cowork\nReview & Distribute"]
         NT["📋 Notion\nDB · Tasks · Research Hub"]
     end
 
@@ -68,7 +71,10 @@ graph TB
     WK <--> OB_RPi
     OB_RPi <-- bi-directional --> ST
     ST <-- bi-directional --> OB_PC
+    ZT -->|"review"| CW
+    CW -->|"PDF + metadata"| OB_PC
     CW --> NT
+    HA -- MCP Zotero --> ZT
     HA -- MCP optional --> NT
 
     style RPi5 fill:#1a1207,stroke:#f5a623,stroke-width:1px,color:#f5a623
@@ -76,7 +82,7 @@ graph TB
     style PC fill:#0d1117,stroke:#60a5fa,stroke-width:1px,color:#60a5fa
 ```
 
-> **Prinsip Local-First:** Seluruh inferensi, memori, dan wiki berjalan di RPi5 tanpa mengirimkan data ke cloud. Claude Cowork dan Notion digunakan hanya untuk tugas yang membutuhkan antarmuka GUI atau kolaborasi tim.
+> **Prinsip Local-First:** Seluruh inferensi, memori, dan wiki berjalan di RPi5 tanpa mengirimkan data ke cloud. **Zotero** berperan sebagai gerbang masuk literatur: Claude Cowork mereview library Zotero dan mendistribusikan ke Obsidian (`raw/`) dan Notion (Paper Library). Hermes kemudian meng-ingest dari Obsidian seperti biasa.
 
 ---
 
@@ -89,7 +95,8 @@ graph TB
 | **MemPalace** | Memori jangka panjang (L0–L3) | RPi5 ChromaDB | Hermes otomatis |
 | **Obsidian Vault** | Wiki human-readable | RPi5 + PC (sync) | Hermes via LLM-Wiki |
 | **Syncthing** | Sinkronisasi vault P2P | LAN | — |
-| **Claude Cowork** | Desktop automation, GUI tasks | PC | Anda + AI |
+| **Zotero** | Reference manager, literatur & sitasi | PC | Anda (input) |
+| **Claude Cowork** | Review Zotero & distribusikan ke Obsidian/Notion | PC | Anda + AI |
 | **Notion** | Project management, database | Cloud | Anda + Hermes via MCP |
 | **LLM-Wiki (Karpathy)** | Pattern wiki persisten | wiki/ di vault | Hermes |
 
@@ -99,6 +106,7 @@ graph TB
 ```
 MemPalace        → Memori AI lintas sesi, semua topik, verbatim ChromaDB
 Obsidian Wiki    → Knowledge base terstruktur per topik riset
+Zotero           → Reference manager: PDF, metadata, catatan anotasi
 Notion           → Proyek aktif, task tracking, timeline
 MEMORY.md/USER.md → Profil pengguna Hermes (preferensi personal)
 log.md           → Audit trail kronologis semua operasi wiki
@@ -509,6 +517,103 @@ related: "[[entities/transformer]], [[concepts/self-attention]]"
 
 ---
 
+## Integrasi Zotero
+
+Zotero adalah **gerbang masuk utama literatur** dalam ekosistem ini. Semua paper, artikel, dan referensi dikelola di Zotero terlebih dahulu sebelum didistribusikan ke Obsidian dan Notion oleh Claude Cowork.
+
+### Peran Zotero dalam Ekosistem
+
+```mermaid
+flowchart TD
+    Z["📚 Zotero Library
+PDF · Metadata · Anotasi · Tags"]
+    CW["🤝 Claude Cowork
+Mereview & memproses library"]
+    OB["📓 Obsidian raw/papers/
++ wiki stub otomatis"]
+    NT["📋 Notion Paper Library
+Entry terstruktur + metadata"]
+    H["⚙️ Hermes
+Ingest dari raw/ → MemPalace + Wiki"]
+
+    Z -->|"1. Review library
+baru / belum diproses"| CW
+    CW -->|"2. Export PDF +
+metadata"| OB
+    CW -->|"3. Buat entry
+terstruktur"| NT
+    OB -->|"4. Hermes ingest
+otomatis"| H
+
+    style Z fill:#1a1207,stroke:#f5a623
+    style CW fill:#0a1a17,stroke:#2dd4bf
+    style OB fill:#0a1127,stroke:#60a5fa
+    style NT fill:#0a1a0f,stroke:#4ade80
+    style H fill:#12093d,stroke:#c084fc
+```
+
+### Workflow: Zotero → Cowork → Obsidian + Notion
+
+**Step 1 — Anda menambah paper ke Zotero** (seperti biasa):
+- Drag & drop PDF ke Zotero
+- Gunakan Zotero browser connector untuk simpan dari web
+- Zotero otomatis mengambil metadata (judul, penulis, DOI, abstrak)
+
+**Step 2 — Claude Cowork mereview library:**
+```
+"Cek Zotero library saya. Temukan semua paper dengan tag 'to-ingest'
+atau yang belum diproses. Untuk setiap paper:
+1. Export PDF ke ~/obsidian/hermes-wiki/raw/papers/
+2. Buat stub halaman wiki di wiki/entities/ dengan metadata Zotero
+3. Tambahkan entry ke Notion Paper Library
+4. Tandai sebagai 'processed' di Zotero"
+```
+
+**Step 3 — Hermes meng-ingest dari Obsidian** (alur normal):
+```bash
+# Hermes mendeteksi file baru di raw/papers/ dan memprosesnya
+"Ingest semua PDF baru di raw/papers/ yang belum ada di wiki.
+Update wiki stubs yang dibuat Cowork dengan analisis penuh."
+```
+
+### Hermes ↔ Zotero via MCP
+
+Hermes juga bisa langsung berinteraksi dengan Zotero via MCP server:
+
+```yaml
+# ~/.hermes/config.yaml
+mcp_servers:
+  - name: zotero
+    command: python -m zotero_mcp_server
+    auto_start: true
+```
+
+| MCP Tool Zotero | Fungsi |
+|---|---|
+| `zotero_search_items` | Cari paper di library berdasarkan teks, tag, koleksi |
+| `zotero_get_item_details` | Detail metadata lengkap sebuah paper |
+| `zotero_get_abstract` | Ambil abstrak dari metadata Zotero |
+| `zotero_get_recent_items` | Paper yang baru ditambahkan |
+| `zotero_list_collections` | Daftar koleksi/folder Zotero |
+| `zotero_read_pdf` | Ekstrak teks dari PDF yang terlampir |
+| `zotero_compare_articles` | Bandingkan 2–5 paper secara side-by-side |
+| `zotero_extract_bibliography` | Ekstrak daftar referensi dari paper |
+| `zotero_analyze_article_structure` | Pecah paper ke seksi IMRaD |
+
+### Konvensi Tag Zotero
+
+Standarisasi tag berikut agar Cowork bisa mengotomasi prosesnya:
+
+| Tag | Arti |
+|---|---|
+| `to-ingest` | Siap diproses ke Obsidian + Notion |
+| `processed` | Sudah didistribusikan oleh Cowork |
+| `needs-review` | Perlu Anda baca dulu sebelum diingest |
+| `key-reference` | Referensi utama — mine ke MemPalace wing terpisah |
+| `archived` | Tidak relevan, tidak perlu diingest |
+
+---
+
 ## Workflow Notion
 
 ### Struktur Database
@@ -585,10 +690,12 @@ Claude Cowork adalah desktop agent untuk otomasi tugas berbasis GUI — hal yang
 
 ```mermaid
 flowchart LR
+    ZT["📚 Zotero\nLibrary"]
     CC["🤝 Claude Cowork"]
-    CC -->|"Download PDF\n→ raw/papers/"| ACQ["📥 Akuisisi\nSumber"]
+    ZT -->|"review"| CC
+    CC -->|"PDF → raw/papers/\nmetadata → wiki stub"| ACQ["📥 Obsidian\nIngest"]
+    CC -->|"entry → Paper Library\n+ metadata"| NT2["📋 Notion\nPaper Library"]
     CC -->|"Baca wiki\n→ buat laporan"| REP["📄 Generate\nReport"]
-    CC -->|"Obsidian wiki\n→ Notion DB"| TRF["🔄 Transfer\nWiki→Notion"]
     CC -->|"Rename, sort\nraw/ files"| ORG["🗂️ Organisasi\nFile"]
 
     style CC fill:#1a1207,stroke:#f5a623
@@ -598,14 +705,16 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    A["🤝 Claude Cowork\nDownload PDF\n→ raw/papers/"]
+    A["📚 Zotero\nPaper tersimpan\ndi library"]
     B["⚙️ Hermes\nIngest & Extract\nkey insights"]
     C["🏛️ MemPalace\nStore verbatim\nChromaDB"]
     D["📓 Obsidian Wiki\nWrite wiki pages\n+ update index"]
     E["🔃 Syncthing\nSync ke PC\nObsidian live"]
     F["📋 Notion\nUpdate Paper Library\n(opsional)"]
 
-    A --> B --> C --> D --> E
+    A -->|"Claude Cowork\nreview & export"| B
+    B --> C --> D --> E
+    A -.->|"Cowork langsung"| F
     D -.->|"opsional\nMCP"| F
 
     style A fill:#1a1207,stroke:#f5a623
@@ -616,7 +725,7 @@ flowchart LR
     style F fill:#0a1a0f,stroke:#4ade80
 ```
 
-**Estimasi waktu:** ~2–5 menit per paper. Semua proses berjalan lokal di RPi5.
+**Estimasi waktu:** ~2–5 menit per paper (setelah paper ada di Zotero). Semua proses berjalan lokal di RPi5.
 
 ---
 
