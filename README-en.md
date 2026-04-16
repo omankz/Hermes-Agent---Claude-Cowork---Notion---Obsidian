@@ -72,7 +72,7 @@ graph TB
     OB_RPi <-- bi-directional --> ST
     ST <-- bi-directional --> OB_PC
     ZT -->|"review"| CW
-    CW -->|"export PDF\n+ wiki stub"| OB_PC
+    CW -->|"export .md\n(metadata + abstract)"| OB_PC
     CW --> NT
     HA -- MCP optional --> NT
 
@@ -81,7 +81,7 @@ graph TB
     style PC fill:#0d1117,stroke:#60a5fa,stroke-width:1px,color:#60a5fa
 ```
 
-> **Local-First Principle:** All inference, memory, and wiki operations run on the RPi5 with zero cloud dependency. **Zotero** acts as the literature intake gateway on the PC side. Claude Cowork reviews the Zotero library, exports PDFs + wiki stubs to Obsidian (PC), then Syncthing carries all changes to Obsidian (RPi5). **Hermes only reads from Obsidian on RPi5** — it has no direct access to Zotero.
+> **Local-First Principle:** All inference, memory, and wiki operations run on the RPi5 with zero cloud dependency. **Zotero** acts as the literature intake gateway on the PC side. Claude Cowork reviews the Zotero library, exports **.md files** (metadata, abstract, annotations) to Obsidian (PC), then Syncthing carries all changes to Obsidian (RPi5). **Hermes only reads from Obsidian on RPi5** — it has no direct access to Zotero.
 
 ---
 
@@ -105,7 +105,8 @@ graph TB
 ```
 MemPalace         → AI memory across all sessions, all topics, verbatim ChromaDB
 Obsidian Wiki     → Structured knowledge base per research topic
-Zotero            → Reference manager: PDFs, metadata, annotation notes
+Zotero            → Reference manager: stores original PDFs, metadata, annotations
+Obsidian raw/     → Receives .md exports from Cowork (not PDFs — PDFs stay in Zotero)
 Notion            → Active projects, task tracking, timelines
 MEMORY.md/USER.md → Hermes user profile (personal preferences)
 log.md            → Append-only chronological audit trail of all wiki operations
@@ -193,7 +194,7 @@ systemctl --user start syncthing
 ├── index.md             # Catalog of all wiki pages
 ├── log.md               # Append-only operation log
 ├── raw/                 # IMMUTABLE sources — never modified by Hermes
-│   ├── papers/          # Scientific PDFs
+│   ├── papers/          # .md exports from Zotero via Cowork (not PDFs — PDFs stay in Zotero)
 │   ├── articles/        # Web articles (via Obsidian Web Clipper)
 │   └── assets/          # Images and media
 ├── wiki/                # LLM-generated pages
@@ -456,7 +457,7 @@ schema   ← AGENTS.md + index.md + log.md. Configuration and navigation.
 **INGEST** — Add a new source:
 
 ```
-You → drop file into raw/papers/
+You → add paper to Zotero / drop .md file into raw/papers/
 Hermes:
   1. Read the source
   2. Discuss key points with you (if present)
@@ -525,7 +526,7 @@ type: concept          # concept | entity | synthesis | query
 created: 2026-04-16
 updated: 2026-04-16
 sources:
-  - raw/papers/attention-is-all-you-need.pdf
+  - raw/papers/attention-is-all-you-need.md
   - raw/articles/illustrated-transformer.md
 tags: [transformer, attention, nlp, architecture]
 related: "[[entities/transformer]], [[concepts/self-attention]]"
@@ -547,7 +548,7 @@ PDF · Metadata · Annotations · Tags"]
     CW["🤝 Claude Cowork
 Reviews & processes library"]
     OB["📓 Obsidian raw/papers/
-+ auto wiki stub"]
+.md files (not PDFs)"]
     NT["📋 Notion Paper Library
 Structured entry + metadata"]
     H["⚙️ Hermes
@@ -555,8 +556,8 @@ Ingests from raw/ → MemPalace + Wiki"]
 
     Z -->|"1. Review library
 new / unprocessed"| CW
-    CW -->|"2. Export PDF +
-metadata"| OB
+    CW -->|"2. Export .md
+(metadata + abstract)"| OB
     CW -->|"3. Create structured
 entry"| NT
     OB -->|"4. Syncthing sync
@@ -582,18 +583,18 @@ from Obsidian RPi5"| H
 ```
 "Check my Zotero library. Find all papers tagged 'to-ingest'
 or that haven't been processed yet. For each paper:
-1. Export the PDF to ~/obsidian/hermes-wiki/raw/papers/
-2. Create a wiki stub in wiki/entities/ with Zotero metadata
+1. Export a **.md file** (metadata, abstract, annotations) to ~/obsidian/hermes-wiki/raw/papers/
+2. The .md file already contains Zotero metadata — place it directly in raw/papers/ as a source for Hermes
 3. Add an entry to the Notion Paper Library
 4. Mark as 'processed' in Zotero"
 ```
 
 **Step 3 — Syncthing carries changes to RPi5, then Hermes ingests:**
 ```bash
-# Syncthing automatically syncs raw/papers/ and wiki/ to Obsidian on RPi5
+# Syncthing automatically syncs raw/papers/ (.md files) and wiki/ to Obsidian on RPi5
 # Hermes detects new files in Obsidian RPi5 and processes them
-"Ingest all new PDFs in raw/papers/ that don't yet have a full wiki page.
-Expand the wiki stubs created by Cowork with full analysis."
+"Ingest all new .md files in raw/papers/ that don't yet have a full wiki page.
+Build complete wiki pages from the metadata and abstracts already present."
 ```
 
 ### Claude Cowork ↔ Zotero via MCP
@@ -705,7 +706,7 @@ flowchart LR
     ZT["📚 Zotero\nLibrary"]
     CC["🤝 Claude Cowork"]
     ZT -->|"review"| CC
-    CC -->|"PDF → raw/papers/\nmetadata → wiki stub"| ACQ["📥 Obsidian\nIngest"]
+    CC -->|".md → raw/papers/\n(metadata + abstract)"| ACQ["📥 Obsidian\n.md Export"]
     CC -->|"entry → Paper Library\n+ metadata"| NT2["📋 Notion\nPaper Library"]
     CC -->|"Read wiki\n→ generate report"| REP["📄 Report\nGeneration"]
     CC -->|"Rename, sort\nraw/ files"| ORG["🗂️ File\nOrganization"]
@@ -724,7 +725,7 @@ flowchart LR
     E["🔃 Syncthing\nSync to PC\nObsidian live reload"]
     F["📋 Notion\nUpdate Paper Library\n(optional)"]
 
-    A -->|"Claude Cowork\nreview & export"| B
+    A -->|"Claude Cowork\nreview & export .md"| B
     B --> C --> D --> E
     A -.->|"Cowork direct"| F
     D -.->|"optional\nvia MCP"| F
@@ -754,8 +755,8 @@ hermes
    Include: overview, list of sub-topics, and links to any
    relevant papers already in our database."
 
-# Step 2: Ingest initial literature (PDFs already in raw/papers/)
-> "Ingest all PDFs in raw/papers/llm-memory/ one by one.
+# Step 2: Ingest initial literature (.md Zotero exports already in raw/papers/)
+> "Ingest all .md files in raw/papers/llm-memory/ one by one.
    For each paper: create an entity page, update the topic
    overview, log the key findings in the wiki. Also mine
    into MemPalace wing 'llm-memory-systems'."
@@ -819,7 +820,7 @@ title: [Page title]
 type: concept | entity | synthesis | query
 created: YYYY-MM-DD
 updated: YYYY-MM-DD
-sources: [raw/papers/x.pdf, raw/articles/y.md]
+sources: [raw/papers/x.md, raw/articles/y.md]
 tags: [tag1, tag2]
 ---
 
