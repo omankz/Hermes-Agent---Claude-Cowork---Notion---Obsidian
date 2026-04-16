@@ -72,9 +72,8 @@ graph TB
     OB_RPi <-- bi-directional --> ST
     ST <-- bi-directional --> OB_PC
     ZT -->|"review"| CW
-    CW -->|"PDF + metadata"| OB_PC
+    CW -->|"export PDF\n+ wiki stub"| OB_PC
     CW --> NT
-    HA -- MCP Zotero --> ZT
     HA -- MCP optional --> NT
 
     style RPi5 fill:#1a1207,stroke:#f5a623,stroke-width:1px,color:#f5a623
@@ -82,7 +81,7 @@ graph TB
     style PC fill:#0d1117,stroke:#60a5fa,stroke-width:1px,color:#60a5fa
 ```
 
-> **Local-First Principle:** All inference, memory, and wiki operations run on the RPi5 with zero cloud dependency. **Zotero** acts as the literature intake gateway: Claude Cowork reviews the Zotero library and distributes to Obsidian (`raw/`) and Notion (Paper Library). Hermes then ingests from Obsidian as usual.
+> **Local-First Principle:** All inference, memory, and wiki operations run on the RPi5 with zero cloud dependency. **Zotero** acts as the literature intake gateway on the PC side. Claude Cowork reviews the Zotero library, exports PDFs + wiki stubs to Obsidian (PC), then Syncthing carries all changes to Obsidian (RPi5). **Hermes only reads from Obsidian on RPi5** — it has no direct access to Zotero.
 
 ---
 
@@ -560,8 +559,10 @@ new / unprocessed"| CW
 metadata"| OB
     CW -->|"3. Create structured
 entry"| NT
-    OB -->|"4. Hermes ingest
-automatically"| H
+    OB -->|"4. Syncthing sync
+to RPi5"| S2["🔃 Syncthing"]
+    S2 -->|"5. Hermes ingests
+from Obsidian RPi5"| H
 
     style Z fill:#1a1207,stroke:#f5a623
     style CW fill:#0a1a17,stroke:#2dd4bf
@@ -587,26 +588,19 @@ or that haven't been processed yet. For each paper:
 4. Mark as 'processed' in Zotero"
 ```
 
-**Step 3 — Hermes ingests from Obsidian** (normal flow):
+**Step 3 — Syncthing carries changes to RPi5, then Hermes ingests:**
 ```bash
-# Hermes detects new files in raw/papers/ and processes them
+# Syncthing automatically syncs raw/papers/ and wiki/ to Obsidian on RPi5
+# Hermes detects new files in Obsidian RPi5 and processes them
 "Ingest all new PDFs in raw/papers/ that don't yet have a full wiki page.
 Expand the wiki stubs created by Cowork with full analysis."
 ```
 
-### Hermes ↔ Zotero via MCP
+### Claude Cowork ↔ Zotero via MCP
 
-Hermes can also interact directly with Zotero through its MCP server:
+> **Important:** Zotero MCP tools are used exclusively by **Claude Cowork** (on the PC). Hermes Agent has no direct access to Zotero — it only reads from Obsidian RPi5 after Syncthing has delivered the files.
 
-```yaml
-# ~/.hermes/config.yaml
-mcp_servers:
-  - name: zotero
-    command: python -m zotero_mcp_server
-    auto_start: true
-```
-
-| Zotero MCP Tool | Function |
+| Zotero MCP Tool (used by Cowork) | Function |
 |---|---|
 | `zotero_search_items` | Search library by text, tag, or collection |
 | `zotero_get_item_details` | Full metadata for a specific paper |
